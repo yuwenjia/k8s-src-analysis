@@ -370,17 +370,19 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) error {
 
 ### MoveAllToActiveOrBackoffQueue
 
-代码链接：<https://github.com/kubernetes/kubernetes/blob/release-1.20/pkg/scheduler/internal/queue/scheduling_queue.go#L500>
+代码链接：<https://github.com/kubernetes/kubernetes/blob/7a54f7a6e8bd7e914cd4edb9307f8e54e51bffd4/pkg/scheduler/internal/queue/scheduling_queue.go#L613>
 
 ```go
-func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string) {
+func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event framework.ClusterEvent, preCheck PreEnqueueCheck) {
     p.lock.Lock()
-    defer p.lock.Unlock()
-    // 把map变成slice
-    unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulableQ.podInfoMap))
-    for _, pInfo := range p.unschedulableQ.podInfoMap {
-        unschedulablePods = append(unschedulablePods, pInfo)
-    }
+	defer p.lock.Unlock()
+	unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulablePods.podInfoMap))
+	for _, pInfo := range p.unschedulablePods.podInfoMap {
+    //  前置检查,各种资源变化引起pod调度变化的pods筛选出来，将重新放入新的unschedulablePods中
+		if preCheck == nil || preCheck(pInfo.Pod) {
+			unschedulablePods = append(unschedulablePods, pInfo)
+		}
+	}
     // 调用movePodsToActiveOrBackoffQueue把所有不可调度的Pod移到activeQ或者backoffQ.
     p.movePodsToActiveOrBackoffQueue(unschedulablePods, event)
 }
